@@ -178,8 +178,9 @@ func (g *GUI) startClient() error {
 func main() {
 	g := GUI{}
 	g.app = app.New()
+	lifecycle(g)
 	g.window = g.app.NewWindow("Login")
-	// g.window.Resize(fyne.NewSize(400, 700))
+	g.window.Resize(fyne.NewSize(400, 700))
 	g.loginWindow()
 	g.window.ShowAndRun()
 }
