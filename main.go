@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	
 	"log"
 	
 	"fyne.io/fyne/v2"
@@ -105,6 +104,7 @@ func (g *GUI) loginWindow() {
 func (g *GUI) chatWindow() {
 	g.window.SetTitle("TODO : roomid")
 	g.chatOutput = widget.NewRichText()
+	g.chatOutput.Wrapping = fyne.TextWrapWord
 	g.scrollContainer = container.NewVScroll(g.chatOutput)
 	msgEntry := widget.NewEntry()
 	msgEntry.OnSubmitted = func(s string) {
@@ -138,9 +138,11 @@ func (g *GUI) startClient() error {
 					un:  nm.Username,
 					msg: nm.Message,
 				}
-				g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", rms.un, rms.msg))
-				g.scrollContainer.ScrollToBottom()
-				g.chatOutput.Refresh()
+				fyne.DoAndWait(func() {
+					g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", rms.un, rms.msg))
+					g.chatOutput.Refresh()
+					g.scrollContainer.ScrollToBottom()
+				})
 			case websocket.BinaryMessage:
 				ucm := struct {
 					UC int `json:"cc"`
@@ -151,9 +153,11 @@ func (g *GUI) startClient() error {
 				// TODO : handle user count
 				if globalUserCount != ucm.UC {
 					globalUserCount = ucm.UC
-					g.chatOutput.AppendMarkdown(fmt.Sprintf("User Count: %d", globalUserCount))
-					g.scrollContainer.ScrollToBottom()
-					g.chatOutput.Refresh()
+					fyne.DoAndWait(func() {
+						g.chatOutput.AppendMarkdown(fmt.Sprintf("User Count: %d", globalUserCount))
+						g.chatOutput.Refresh()
+						g.scrollContainer.ScrollToBottom()
+					})
 				}
 			}
 		}
@@ -163,13 +167,15 @@ func (g *GUI) startClient() error {
 	go func() {
 		for {
 			nom := <-sendMessage
-			g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", g.client.Username, nom))
-			g.scrollContainer.ScrollToBottom()
-			g.chatOutput.Refresh()
 			if err := g.client.SendMsg(nom.(string)); err != nil {
 				log.Printf("send message: %v", err)
 				return
 			}
+			fyne.DoAndWait(func() {
+				g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", g.client.Username, nom))
+				g.chatOutput.Refresh()
+				g.scrollContainer.ScrollToBottom()
+			})
 		}
 	}()
 	return nil
