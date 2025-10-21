@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"runtime"
 	
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -73,7 +74,7 @@ func (g *GUI) loginWindow() {
 			Proto:      "ws",
 			RoomID:     "akkTrnwMkFKsqFf4",
 			RoomPass:   "CEZv5XWFrgnifA3I",
-			Username:   "GUI-TEST v0.0.1",
+			Username:   fmt.Sprintf("GUI-TEST-%s-%s", runtime.GOOS, runtime.GOARCH),
 			MessageKey: "3ThCOI8DjsJ2G1O7",
 			MessageChan: make(chan struct {
 				Type int
@@ -102,7 +103,7 @@ func (g *GUI) loginWindow() {
 }
 
 func (g *GUI) chatWindow() {
-	g.window.SetTitle("TODO : roomid")
+	g.window.SetTitle(g.client.RoomID)
 	g.chatOutput = widget.NewRichText()
 	g.chatOutput.Wrapping = fyne.TextWrapWord
 	g.scrollContainer = container.NewVScroll(g.chatOutput)
@@ -140,6 +141,7 @@ func (g *GUI) startClient() error {
 				}
 				fyne.DoAndWait(func() {
 					g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", rms.un, rms.msg))
+					g.chatOutput.AppendMarkdown("---")
 					g.chatOutput.Refresh()
 					g.scrollContainer.ScrollToBottom()
 				})
@@ -155,6 +157,7 @@ func (g *GUI) startClient() error {
 					globalUserCount = ucm.UC
 					fyne.DoAndWait(func() {
 						g.chatOutput.AppendMarkdown(fmt.Sprintf("User Count: %d", globalUserCount))
+						g.chatOutput.AppendMarkdown("---")
 						g.chatOutput.Refresh()
 						g.scrollContainer.ScrollToBottom()
 					})
@@ -173,6 +176,7 @@ func (g *GUI) startClient() error {
 			}
 			fyne.DoAndWait(func() {
 				g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", g.client.Username, nom))
+				g.chatOutput.AppendMarkdown("---")
 				g.chatOutput.Refresh()
 				g.scrollContainer.ScrollToBottom()
 			})
@@ -184,9 +188,8 @@ func (g *GUI) startClient() error {
 func main() {
 	g := GUI{}
 	g.app = app.New()
-	lifecycle(g)
 	g.window = g.app.NewWindow("Login")
-	g.window.Resize(fyne.NewSize(400, 700))
+	lifecycle(g)
 	g.loginWindow()
 	g.window.ShowAndRun()
 }
