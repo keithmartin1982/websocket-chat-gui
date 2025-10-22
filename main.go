@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"runtime"
 	
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -18,6 +17,7 @@ import (
 var (
 	sendMessage     chan interface{}
 	globalUserCount int
+	background      bool = false
 )
 
 type receivedMessage struct {
@@ -34,48 +34,28 @@ type GUI struct {
 }
 
 func (g *GUI) loginWindow() {
-	g.window.SetTitle("websocket-chat-gui v0.0.1")
+	g.window.SetTitle("websocket-chat-gui")
 	addrEntry := widget.NewEntry()
 	addrEntry.SetPlaceHolder("Host")
-	roomIdEntry := widget.NewPasswordEntry() // Use NewPasswordEntry for masked input
+	roomIdEntry := widget.NewPasswordEntry()
 	roomIdEntry.SetPlaceHolder("Room ID")
-	roomPassEntry := widget.NewPasswordEntry() // Use NewPasswordEntry for masked input
+	roomPassEntry := widget.NewPasswordEntry()
 	roomPassEntry.SetPlaceHolder("Room Password")
 	usernameEntry := widget.NewEntry()
 	usernameEntry.SetPlaceHolder("Username")
-	encryptionKeyEntry := widget.NewPasswordEntry() // Use NewPasswordEntry for masked input
+	encryptionKeyEntry := widget.NewPasswordEntry()
 	encryptionKeyEntry.SetPlaceHolder("Encryption Key")
 	messageLabel := widget.NewLabel("")
 	loginButton := widget.NewButton("Login", func() {
 		g.client = &websocket_chat_client.Client{
 			Conn:       nil,
 			Addr:       addrEntry.Text,
-			Proto:      "ws",
+			Proto:      "wss",
+			SelfSigned: true,
 			RoomID:     roomIdEntry.Text,
 			RoomPass:   roomPassEntry.Text,
 			Username:   usernameEntry.Text,
 			MessageKey: encryptionKeyEntry.Text,
-			MessageChan: make(chan struct {
-				Type int
-				Data []byte
-			}),
-		}
-		if err := g.startClient(); err != nil {
-			messageLabel.SetText("Login Not Successful!")
-		} else {
-			messageLabel.SetText("Login Successful!")
-			g.chatWindow()
-		}
-	})
-	testButton := widget.NewButton("TestLogin", func() {
-		g.client = &websocket_chat_client.Client{
-			Conn:       nil,
-			Addr:       "10.0.0.10:8080",
-			Proto:      "ws",
-			RoomID:     "akkTrnwMkFKsqFf4",
-			RoomPass:   "CEZv5XWFrgnifA3I",
-			Username:   fmt.Sprintf("GUI-TEST-%s-%s", runtime.GOOS, runtime.GOARCH),
-			MessageKey: "3ThCOI8DjsJ2G1O7",
 			MessageChan: make(chan struct {
 				Type int
 				Data []byte
@@ -97,7 +77,6 @@ func (g *GUI) loginWindow() {
 		encryptionKeyEntry,
 		loginButton,
 		messageLabel,
-		testButton,
 	)
 	g.window.SetContent(content)
 }
@@ -139,12 +118,7 @@ func (g *GUI) startClient() error {
 					un:  nm.Username,
 					msg: nm.Message,
 				}
-				fyne.DoAndWait(func() {
-					g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", rms.un, rms.msg))
-					g.chatOutput.AppendMarkdown("---")
-					g.chatOutput.Refresh()
-					g.scrollContainer.ScrollToBottom()
-				})
+				g.appendText(rms.un, rms.msg)
 			case websocket.BinaryMessage:
 				ucm := struct {
 					UC int `json:"cc"`
@@ -155,12 +129,7 @@ func (g *GUI) startClient() error {
 				// TODO : handle user count
 				if globalUserCount != ucm.UC {
 					globalUserCount = ucm.UC
-					fyne.DoAndWait(func() {
-						g.chatOutput.AppendMarkdown(fmt.Sprintf("User Count: %d", globalUserCount))
-						g.chatOutput.AppendMarkdown("---")
-						g.chatOutput.Refresh()
-						g.scrollContainer.ScrollToBottom()
-					})
+					g.appendText("User Count", globalUserCount)
 				}
 			}
 		}
@@ -174,22 +143,43 @@ func (g *GUI) startClient() error {
 				log.Printf("send message: %v", err)
 				return
 			}
-			fyne.DoAndWait(func() {
-				g.chatOutput.AppendMarkdown(fmt.Sprintf("%s: %s", g.client.Username, nom))
-				g.chatOutput.AppendMarkdown("---")
-				g.chatOutput.Refresh()
-				g.scrollContainer.ScrollToBottom()
-			})
+			g.appendText(g.client.Username, nom)
 		}
 	}()
 	return nil
+}
+
+func (g *GUI) appendText(prefix, content any) {
+	if background {
+		fyne.CurrentApp().SendNotification(&fyne.Notification{
+			Title:   fmt.Sprintf("Msg from: %v", prefix),
+			Content: fmt.Sprintf("%v", content),
+		})
+	}
+	fyne.DoAndWait(func() {
+		g.chatOutput.AppendMarkdown(fmt.Sprintf("%v: %v", prefix, content))
+		g.chatOutput.AppendMarkdown("---")
+		g.chatOutput.Refresh()
+		g.scrollContainer.ScrollToBottom()
+	})
+}
+
+func (g *GUI) lifecycle() {
+	// App battery usage unrestricted is required for background websocket connection
+	lifecycle := g.app.Lifecycle()
+	lifecycle.SetOnExitedForeground(func() {
+		background = true
+	})
+	lifecycle.SetOnEnteredForeground(func() {
+		background = false
+	})
 }
 
 func main() {
 	g := GUI{}
 	g.app = app.New()
 	g.window = g.app.NewWindow("Login")
-	lifecycle(g)
+	platformDo(g)
 	g.loginWindow()
 	g.window.ShowAndRun()
 }

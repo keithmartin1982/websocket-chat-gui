@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	fyne.io/fyne/v2 v2.7.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/keithmartin1982/websocket_chat_client v0.0.2
+	github.com/keithmartin1982/websocket_chat_client v0.0.3
 )
 
 require (
